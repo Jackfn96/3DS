@@ -24,6 +24,7 @@ class Drive(Logs):
         super().__init__(debug)
 
         self.parent = None
+        self.ids = []
 
         # set file paths
         token_path = os.path.abspath(os.path.join(__file__, '..', '..', 'token.json'))
@@ -64,8 +65,7 @@ class Drive(Logs):
         
 
 
-
-    def list(self, file_type, query=None):
+    def list(self, file_type, add_query=None, only_main_folder=False):
         """
         Lists items of selected type
         Query as per instruction in https://developers.google.com/drive/api/v3/ref-search-terms
@@ -83,10 +83,13 @@ class Drive(Logs):
         page_token = None
         records = []
         
-        if query:
-            query = f"mimeType = '{mime[file_type]}' and " + query
-        else:
-            query = f"mimeType = '{mime[file_type]}'"
+        query = f"mimeType = '{mime[file_type]}'"
+        if add_query:
+            query += f" and {add_query}"
+        if only_main_folder:
+            query += f" and '{self.parent}' in parents"
+
+        self.print(query)
 
         while True:
             response = self.service.files().list(q=query,
@@ -103,10 +106,63 @@ class Drive(Logs):
         
         return records
     
+
     def get_partent_id(self):
-        folder_list = self.list('folder', query="name = 'core simulateur'")
+        """
+        Searches for the main folder with project data
+        """
+        folder_list = self.list('folder', add_query="name = 'core simulateur'")
 
         if len(folder_list) != 1:
             raise LookupError('Unable to find Google Drive parent folder')
         
         self.parent = folder_list[0]['id']
+    
+
+    def get_videos(self):
+        """
+        Returns a list of all videos in main folder
+        """
+        videos = self.list('flv', only_main_folder=True)
+        for video in videos:
+            self.ids.append(video['name'].rstrip('.flv'))
+
+    
+    def get_video_data(self, id):
+        """
+        Searches for all files containing video ID
+        """
+        query = f"name contains '{id}'"
+
+        annotations = self.list('csv', query)
+        evaluations = self.list('xlsx', query)
+
+        # HRV readings use different file name format
+        id_split = id.split()
+        if len(id_split) == 2:
+            # add blank 'driver code'
+            # TODO: find out what 'driver code' means
+            id_split.append('_')
+        date, time, code = id_split
+        year, month, day = date.split('-')
+        hour, minute, _ = time.split('-')
+        hrv_datetime_query = f"name contains '{day}_{month}_{year}_{hour}'"
+        if code != '_':
+            hrv_code_query = f" and name contains '{code}'"
+        hrv_query = hrv_datetime_query + hrv_code_query
+
+        hrv_readings = self.list('txt', hrv_query)
+
+        return annotations + evaluations + hrv_readings
+    
+    def download(self, file_id):
+        request = self.service.files().get_media(fileId=file_id)
+        # TODO: remove BytesIO() if possible
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+            print("Download %d%%." % int(status.progress() * 100))
+        
+        return io.StringIO(fh.getvalue().decode())
