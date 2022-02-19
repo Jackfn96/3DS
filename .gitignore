@@ -7,3 +7,5 @@ raw_data/
 **/__pycache__/
 .env
 .python-version
+token.json
+3ds_gcloud_api.json
