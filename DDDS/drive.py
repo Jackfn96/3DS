@@ -23,7 +23,7 @@ class Drive(Logs):
         # init of Logs class
         super().__init__(debug)
 
-        self.parent = None
+        self.folders = None
         self.ids = []
 
         # set file paths
@@ -58,17 +58,22 @@ class Drive(Logs):
             return
         
         try:
-            self.get_partent_id()
+            self.folders = []
+            self.get_partent_folder_id()
+            self.get_children_folders_id()
+            self.get_data_folder_id()
         except LookupError as error:
             self.print(f'Ann error occured: {error}')
             return
         
 
 
-    def list(self, file_type, add_query=None, only_main_folder=False):
+    def list(self, file_type, add_query=None, entire_drive=False):
         """
         Lists items of selected type
         Query as per instruction in https://developers.google.com/drive/api/v3/ref-search-terms
+        entire_drive enables search in entire Google Drive, by default searches only in 'data' folder and
+        in 'core simulateur' and it's child folders
         """
         mime = {'flv': 'video/flv',
                 'csv': 'text/csv',
@@ -83,11 +88,18 @@ class Drive(Logs):
         page_token = None
         records = []
         
+        # Limit file type
         query = f"mimeType = '{mime[file_type]}'"
+
+        # Limit search folders
+        if not entire_drive:
+            query += ' and ('
+            query += ' or '.join([f"'{folder}' in parents" for folder in self.folders])
+            query += ')'
+
+        # Additional query, if any
         if add_query:
             query += f" and {add_query}"
-        if only_main_folder:
-            query += f" and '{self.parent}' in parents"
 
         self.print(query)
 
@@ -107,23 +119,54 @@ class Drive(Logs):
         return records
     
 
-    def get_partent_id(self):
+    def get_partent_folder_id(self):
         """
         Searches for the main folder with project data
         """
-        folder_list = self.list('folder', add_query="name = 'core simulateur'")
+        folder_list = self.list('folder', add_query="name = 'core simulateur'", entire_drive=True)
 
         if len(folder_list) != 1:
             raise LookupError('Unable to find Google Drive parent folder')
         
-        self.parent = folder_list[0]['id']
+        self.folders.append(folder_list[0]['id'])
     
+
+    def get_children_folders_id(self):
+        """
+        Searches for folders in self.parent_folder and adds them to self.children_folders
+        """
+        folder_list = self.list('folder', add_query=f"'{self.folders[0]}' in parents", entire_drive=True)
+
+        if len(folder_list) < 1:
+            raise LookupError('Unable to find Google Drive children folders')
+
+        self.folders += [folder['id'] for folder in folder_list]
+
+    def get_data_folder_id(self):
+        """
+        Searches for data folder in Google Drive
+        This folder includes two sub-folders: 'annotations' and 'data non utilises'
+        """
+        folder_list = self.list('folder', add_query=f"name = 'data'", entire_drive=True)
+
+        for folder in folder_list:
+            sub_folders = self.list('folder', add_query=f"'{folder['id']}' in parents", entire_drive=True)
+            sub_folders_names = [folder['name'] for folder in sub_folders]
+            if len(sub_folders) == 2\
+                and 'data non utilisés' in sub_folders_names\
+                and 'annotations' in sub_folders_names:
+                # found folder with correct sub-folders
+                self.folders.append(folder['id'])
+                return
+        
+        raise LookupError('Unable to find Google Drive data folder')
+
 
     def get_videos(self):
         """
         Returns a list of all videos in main folder
         """
-        videos = self.list('flv', only_main_folder=True)
+        videos = self.list('flv')
         for video in videos:
             self.ids.append(video['name'].rstrip('.flv'))
 
@@ -153,16 +196,27 @@ class Drive(Logs):
 
         hrv_readings = self.list('txt', hrv_query)
 
-        return annotations + evaluations + hrv_readings
+        return annotations, evaluations, hrv_readings
     
-    def download(self, file_id):
+    def download(self, file_id, return_bytes=False):
+        """
+        Downloads file from Google Drive
+        by default returns string content
+        return_bytes=True returns bytes file content (for non-text files)
+        """
         request = self.service.files().get_media(fileId=file_id)
-        # TODO: remove BytesIO() if possible
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while done is False:
-            status, done = downloader.next_chunk()
-            print("Download %d%%." % int(status.progress() * 100))
-        
-        return io.StringIO(fh.getvalue().decode())
+        with io.BytesIO() as fh:
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
+                print("Download %d%%." % int(status.progress() * 100))
+            
+            if return_bytes:
+                return fh.getvalue()
+
+            return io.StringIO(fh.getvalue().decode())
+    
+    def save_locally(self, bytes):
+        # TODO: saving files
+        pass
