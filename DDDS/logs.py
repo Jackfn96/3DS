@@ -6,9 +6,13 @@ class Logs():
     def __init__(self, debug=False):
         self.debug = debug
     
-    def print(self, message):
+    def print(self, message, debug=False):
         """
-        Prints log only if debugging is enabled
+        Prints logs
         """
-        if self.debug:
-            print(message)
+        # if message type is set to debug (debug=True) but overall debugging is disabled
+        if debug and not self.debug:
+            return
+        
+        print(message)
+        
