@@ -65,7 +65,7 @@ class Drive(Logs):
             self.get_children_folders_id()
             self.get_data_folder_id()
         except LookupError as error:
-            self.print(f'Ann error occured: {error}', True)
+            self.print(f'An error occured: {error}', True)
             return
         
 
