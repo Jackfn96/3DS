@@ -46,6 +46,8 @@ class Drive(Logs):
             # Save the credentials for the next run
             with open(token_path, 'w') as token:
                 token.write(creds.to_json())
+            
+            
 
         # Build drive service connection
         try:
@@ -54,7 +56,7 @@ class Drive(Logs):
             self.service = service
         except HttpError as error:
             # TODO - Improve error handling
-            self.print(f'Unable to build Google Drive service connection: {error}')
+            self.print(f'Unable to build Google Drive service connection: {error}', True)
             return
         
         try:
@@ -63,7 +65,7 @@ class Drive(Logs):
             self.get_children_folders_id()
             self.get_data_folder_id()
         except LookupError as error:
-            self.print(f'Ann error occured: {error}')
+            self.print(f'Ann error occured: {error}', True)
             return
         
 
@@ -82,7 +84,7 @@ class Drive(Logs):
                 'folder': 'application/vnd.google-apps.folder'}
         
         if file_type not in mime.keys():
-            self.print(f"Wrong file type - {file_type}!")
+            self.print(f"Wrong file type - {file_type}!", True)
             return
         
         page_token = None
@@ -101,7 +103,7 @@ class Drive(Logs):
         if add_query:
             query += f" and {add_query}"
 
-        self.print(query)
+        self.print(query, True)
 
         while True:
             response = self.service.files().list(q=query,
@@ -220,3 +222,7 @@ class Drive(Logs):
     def save_locally(self, bytes):
         # TODO: saving files
         pass
+
+if __name__ == '__main__':
+    # enable commection to Google Drive
+    drive = Drive()
