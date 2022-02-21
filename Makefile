@@ -5,10 +5,10 @@ install_requirements:
 	@pip install -r requirements.txt
 
 check_code:
-	@flake8 scripts/* 3DS/*.py
+	@flake8 scripts/* DDDS/*.py
 
 black:
-	@black scripts/* 3DS/*.py
+	@black scripts/* DDDS/*.py
 
 test:
 	@coverage run -m pytest tests/*.py
@@ -22,8 +22,8 @@ clean:
 	@rm -f .coverage
 	@rm -fr */__pycache__ */*.pyc __pycache__
 	@rm -fr build dist
-	@rm -fr 3DS-*.dist-info
-	@rm -fr 3DS.egg-info
+	@rm -fr DDDS-*.dist-info
+	@rm -fr DDDS.egg-info
 
 install:
 	@pip install . -U
@@ -40,6 +40,11 @@ count_lines:
 	@find ./tests -name '*.py' -exec  wc -l {} \; | sort -n| awk \
         '{printf "%4s %s\n", $$1, $$2}{s+=$$0}END{print s}'
 	@echo ''
+
+
+# Authorize Google Drive access
+connect_drive:
+	@python -m DDDS.drive
 
 # ----------------------------------
 #      UPLOAD PACKAGE TO PYPI
