@@ -219,9 +219,22 @@ class Drive(Logs):
 
             return io.StringIO(fh.getvalue().decode())
     
-    def save_locally(self, bytes):
-        # TODO: saving files
-        pass
+    def save_locally(self, bytes_string, path):
+        if isinstance(bytes_string, bytes):
+            # if self.download return_bytes was set True
+            mode = 'wb'
+        else:
+            # if self.download return_bytes was set False (default)
+            # convert to string type
+            mode = 'w'
+            bytes_string = bytes_string.getvalue()
+
+        file_path = os.path.abspath(os.path.join(__file__, '..', '..', 'data', path))
+        with open(file_path, mode) as file_handler:
+            file_handler.write(bytes_string)
+        
+        self.print(f"File saved to {file_path}")
+
 
 if __name__ == '__main__':
     # enable commection to Google Drive
