@@ -222,7 +222,7 @@ class Drive(Logs):
             done = False
             while done is False:
                 status, done = downloader.next_chunk()
-                print("Download %d%%." % int(status.progress() * 100))
+                self.print("Download %d%%." % int(status.progress() * 100), debug=True)
             
             if return_bytes:
                 return fh.getvalue()
