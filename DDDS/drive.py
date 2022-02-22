@@ -63,7 +63,7 @@ class Drive(Logs):
         
         try:
             self.folders = []
-            self.get_partent_folder_id()
+            self.get_parent_folder_id()
             self.get_data_folder_id()
             self.get_children_folders_id(exclude=exclude)
         except LookupError as error:
@@ -123,7 +123,7 @@ class Drive(Logs):
         return records
     
 
-    def get_partent_folder_id(self):
+    def get_parent_folder_id(self):
         """
         Searches for the main folder with project data
         """
