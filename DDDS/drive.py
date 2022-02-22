@@ -15,15 +15,17 @@ from googleapiclient.http import MediaIoBaseDownload
 class Drive(Logs):
     # Defines the level of access to Google Drive
     SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+    # Folders always to be excluded from Google Drive search
+    EXCLUDED_FOLDERS = ['échantillon']
 
-    def __init__(self, debug=False):
+    def __init__(self, exclude=[], debug=False):
         """
         Authentication to Google Drive
         """
         # init of Logs class
         super().__init__(debug)
 
-        self.folders = None
+        self.folders = []
         self.ids = []
 
         # set file paths
@@ -62,10 +64,10 @@ class Drive(Logs):
         try:
             self.folders = []
             self.get_partent_folder_id()
-            self.get_children_folders_id()
             self.get_data_folder_id()
+            self.get_children_folders_id(exclude=exclude)
         except LookupError as error:
-            self.print(f'Ann error occured: {error}', True)
+            self.print(f'An error occured: {error}', True)
             return
         
 
@@ -132,23 +134,14 @@ class Drive(Logs):
         
         self.folders.append(folder_list[0]['id'])
     
-
-    def get_children_folders_id(self):
-        """
-        Searches for folders in self.parent_folder and adds them to self.children_folders
-        """
-        folder_list = self.list('folder', add_query=f"'{self.folders[0]}' in parents", entire_drive=True)
-
-        if len(folder_list) < 1:
-            raise LookupError('Unable to find Google Drive children folders')
-
-        self.folders += [folder['id'] for folder in folder_list]
-
-    def get_data_folder_id(self):
+    def get_data_folder_id(self, exclude=[]):
         """
         Searches for data folder in Google Drive
         This folder includes two sub-folders: 'annotations' and 'data non utilises'
         """
+        # Some folders set to be always excluded
+        exclude += self.EXCLUDED_FOLDERS
+
         folder_list = self.list('folder', add_query=f"name = 'data'", entire_drive=True)
 
         for folder in folder_list:
@@ -162,6 +155,23 @@ class Drive(Logs):
                 return
         
         raise LookupError('Unable to find Google Drive data folder')
+
+    def get_children_folders_id(self, exclude=[]):
+        """
+        Searches for folders in self.parent_folder and adds them to self.children_folders
+        exclude - list of folders to exclude from search
+        """
+        # Some folders set to be always excluded
+        exclude += self.EXCLUDED_FOLDERS
+
+        # look for sub-folders of 'parent' and 'data'
+        folder_list = self.list('folder', add_query=f"('{self.folders[0]}' in parents or '{self.folders[1]}' in parents)", entire_drive=True)
+
+        if len(folder_list) < 1:
+            raise LookupError('Unable to find Google Drive children folders')
+
+        # remove 
+        self.folders += [folder['id'] for folder in folder_list if folder['name'] not in exclude]
 
 
     def get_videos(self):
@@ -212,7 +222,7 @@ class Drive(Logs):
             done = False
             while done is False:
                 status, done = downloader.next_chunk()
-                print("Download %d%%." % int(status.progress() * 100))
+                self.print("Download %d%%." % int(status.progress() * 100), debug=True)
             
             if return_bytes:
                 return fh.getvalue()
@@ -234,6 +244,7 @@ class Drive(Logs):
             file_handler.write(bytes_string)
         
         self.print(f"File saved to {file_path}")
+        return file_path
 
 
 if __name__ == '__main__':
