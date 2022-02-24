@@ -25,7 +25,7 @@ yapf
 # utilities
 # six>=1.14
 # joblib
-memoized-property
+#memoized-property
 # termcolor
 
 
@@ -40,6 +40,7 @@ charset-normalizer
 colorama
 cryptography
 docutils
+python-dotenv
 google-api-core
 google-api-python-client
 google-auth
