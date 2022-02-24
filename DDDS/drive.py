@@ -34,7 +34,6 @@ class Drive(Logs):
         self.ids = []
 
         # set file paths
-        
         api_key_path = os.path.abspath(os.path.join(__file__, '..', '..', '3ds_gcloud_api.json'))
         
         # Check for local authentication token
@@ -269,4 +268,4 @@ class Drive(Logs):
 
 if __name__ == '__main__':
     # enable commection to Google Drive
-    drive = Drive(debug=True)
+    drive = Drive()
