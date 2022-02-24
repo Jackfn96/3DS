@@ -1,7 +1,7 @@
 import os
 from DDDS.drive import Drive
 
-drive = Drive()
+drive = Drive(debug=True)
 
 def test_auth():
     assert(isinstance(drive.folders, list))
