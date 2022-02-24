@@ -2,8 +2,11 @@
 Reading data from Google Drive
 """
 
+from os import environ
 import os.path
 import io
+import json
+from dotenv import load_dotenv
 from DDDS.logs import Logs
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -17,6 +20,7 @@ class Drive(Logs):
     SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
     # Folders always to be excluded from Google Drive search
     EXCLUDED_FOLDERS = ['échantillon']
+    TOKEN_PATH = os.path.abspath(os.path.join(__file__, '..', '..', 'token.json'))
 
     def __init__(self, exclude=[], debug=False):
         """
@@ -24,33 +28,33 @@ class Drive(Logs):
         """
         # init of Logs class
         super().__init__(debug)
+        load_dotenv()
 
         self.folders = []
         self.ids = []
 
         # set file paths
-        token_path = os.path.abspath(os.path.join(__file__, '..', '..', 'token.json'))
+        
         api_key_path = os.path.abspath(os.path.join(__file__, '..', '..', '3ds_gcloud_api.json'))
-
+        
         # Check for local authentication token
-        creds = None
-        if os.path.exists(token_path):
-            creds = Credentials.from_authorized_user_file(token_path, self.SCOPES)
+        creds = self.get_credentials()
 
         # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
+                # Try to refresh the token
                 creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    api_key_path, self.SCOPES)
-                creds = flow.run_local_server(port=0)
-            # Save the credentials for the next run
-            with open(token_path, 'w') as token:
-                token.write(creds.to_json())
-            
-            
+                try:
+                    with open(self.TOKEN_PATH, 'w') as token:
+                        token.write(creds.to_json())
+                except OSError:
+                    self.print('Cannot save token')
 
+        if not creds and not creds.valid:
+            # Refresh unsuccessful
+            raise ValueError('Google Drive credentials invalid. Update Token')
+            
         # Build drive service connection
         try:
             service = build('drive', 'v3', credentials=creds)
@@ -70,6 +74,14 @@ class Drive(Logs):
             self.print(f'An error occured: {error}', True)
             return
         
+    def get_credentials(self):
+        env_token = os.getenv('DRIVE_TOKEN')
+
+        if os.path.exists(self.TOKEN_PATH):
+            return Credentials.from_authorized_user_file(self.TOKEN_PATH, self.SCOPES)
+        elif env_token:
+            return Credentials.from_authorized_user_info(json.loads(env_token), self.SCOPES)
+        return None
 
 
     def list(self, file_type, add_query=None, entire_drive=False):
@@ -245,6 +257,13 @@ class Drive(Logs):
         
         self.print(f"File saved to {file_path}")
         return file_path
+
+# def get_new_token():
+#     flow = InstalledAppFlow.from_client_secrets_file(api_key_path, self.SCOPES)
+#         creds = flow.run_local_server(port=0)
+#         Save the credentials for the next run
+#         with open(self.TOKEN_PATH, 'w') as token:
+#         token.write(creds.to_json())
 
 
 if __name__ == '__main__':
