@@ -51,7 +51,7 @@ class Drive(Logs):
                 except OSError:
                     self.print('Cannot save token')
 
-        if not creds and not creds.valid:
+        if not creds or not creds.valid:
             # Refresh unsuccessful
             raise ValueError('Google Drive credentials invalid. Update Token')
             
