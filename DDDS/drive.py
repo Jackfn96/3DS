@@ -38,7 +38,7 @@ class Drive(Logs):
         
         # Check for local authentication token
         creds = self.get_credentials()
-        self.print(creds, debug=True)
+        self.print(f"Credentials: {creds}", debug=True)
 
         # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:
@@ -76,6 +76,7 @@ class Drive(Logs):
         
     def get_credentials(self):
         env_token = os.getenv('DRIVE_TOKEN')
+        self.print(f"Env_token: {env_token}", debug=True)
 
         if os.path.exists(self.TOKEN_PATH):
             return Credentials.from_authorized_user_file(self.TOKEN_PATH, self.SCOPES)
