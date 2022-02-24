@@ -44,6 +44,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     - name: Install package and test
+      env:
+        DRIVE_TOKEN: ${{ secrets.DRIVE_TOKEN }}
       run: |
         make install test clean
 
