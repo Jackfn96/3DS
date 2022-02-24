@@ -76,7 +76,6 @@ class Drive(Logs):
         
     def get_credentials(self):
         env_token = os.getenv('DRIVE_TOKEN')
-        self.print(f"Env_token: {env_token}", debug=True)
 
         if os.path.exists(self.TOKEN_PATH):
             return Credentials.from_authorized_user_file(self.TOKEN_PATH, self.SCOPES)
