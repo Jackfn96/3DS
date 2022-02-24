@@ -39,6 +39,7 @@ class Drive(Logs):
         
         # Check for local authentication token
         creds = self.get_credentials()
+        self.print(creds, debug=True)
 
         # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:
@@ -268,4 +269,4 @@ class Drive(Logs):
 
 if __name__ == '__main__':
     # enable commection to Google Drive
-    drive = Drive()
+    drive = Drive(debug=True)
