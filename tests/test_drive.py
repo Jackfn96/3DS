@@ -1,4 +1,4 @@
-import os
+#import os
 from DDDS.drive import Drive
 
 drive = Drive(debug=True)
