@@ -2,9 +2,13 @@
 Reading data from Google Drive
 """
 
+from os import environ
 import os.path
 import io
-from DDDS.logs import Logs
+import json
+from dotenv import load_dotenv
+from DDDS.utils import Logs
+from DDDS.utils import printProgressBar
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -17,6 +21,7 @@ class Drive(Logs):
     SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
     # Folders always to be excluded from Google Drive search
     EXCLUDED_FOLDERS = ['échantillon']
+    TOKEN_PATH = os.path.abspath(os.path.join(__file__, '..', '..', 'token.json'))
 
     def __init__(self, exclude=[], debug=False):
         """
@@ -24,33 +29,33 @@ class Drive(Logs):
         """
         # init of Logs class
         super().__init__(debug)
+        load_dotenv()
 
         self.folders = []
         self.ids = []
 
         # set file paths
-        token_path = os.path.abspath(os.path.join(__file__, '..', '..', 'token.json'))
         api_key_path = os.path.abspath(os.path.join(__file__, '..', '..', '3ds_gcloud_api.json'))
-
+        
         # Check for local authentication token
-        creds = None
-        if os.path.exists(token_path):
-            creds = Credentials.from_authorized_user_file(token_path, self.SCOPES)
+        creds = self.get_credentials()
+        self.print(f"Credentials: {creds}", debug=True)
 
         # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
+                # Try to refresh the token
                 creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    api_key_path, self.SCOPES)
-                creds = flow.run_local_server(port=0)
-            # Save the credentials for the next run
-            with open(token_path, 'w') as token:
-                token.write(creds.to_json())
-            
-            
+                try:
+                    with open(self.TOKEN_PATH, 'w') as token:
+                        token.write(creds.to_json())
+                except OSError:
+                    self.print('Cannot save token')
 
+        if not creds or not creds.valid:
+            # Refresh unsuccessful
+            raise ValueError('Google Drive credentials invalid. Update Token')
+            
         # Build drive service connection
         try:
             service = build('drive', 'v3', credentials=creds)
@@ -63,13 +68,21 @@ class Drive(Logs):
         
         try:
             self.folders = []
-            self.get_partent_folder_id()
+            self.get_parent_folder_id()
             self.get_data_folder_id()
             self.get_children_folders_id(exclude=exclude)
         except LookupError as error:
             self.print(f'An error occured: {error}', True)
             return
         
+    def get_credentials(self):
+        env_token = os.getenv('DRIVE_TOKEN')
+
+        if os.path.exists(self.TOKEN_PATH):
+            return Credentials.from_authorized_user_file(self.TOKEN_PATH, self.SCOPES)
+        elif env_token:
+            return Credentials.from_authorized_user_info(json.loads(env_token), self.SCOPES)
+        return None
 
 
     def list(self, file_type, add_query=None, entire_drive=False):
@@ -123,7 +136,7 @@ class Drive(Logs):
         return records
     
 
-    def get_partent_folder_id(self):
+    def get_parent_folder_id(self):
         """
         Searches for the main folder with project data
         """
@@ -213,22 +226,37 @@ class Drive(Logs):
     def download(self, file_id, return_bytes=False):
         """
         Downloads file from Google Drive
-        by default returns string content
-        return_bytes=True returns bytes file content (for non-text files)
         """
-        request = self.service.files().get_media(fileId=file_id)
-        with io.BytesIO() as fh:
-            downloader = MediaIoBaseDownload(fh, request)
-            done = False
-            while done is False:
-                status, done = downloader.next_chunk()
-                self.print("Download %d%%." % int(status.progress() * 100), debug=True)
-            
-            if return_bytes:
-                return fh.getvalue()
+        # Legacy compatibility, file_id can be string of one ID or list of IDs
+        return_string = False
+        if isinstance(file_id, str):
+            file_id = [file_id]
+            return_string = True
 
-            return io.StringIO(fh.getvalue().decode())
+        content = []
+        file_count = 0
+
+        for file in file_id:
+            printProgressBar(file_count, len(file_id), prefix = 'Progress:', suffix = 'Complete', length = 50)
+
+            request = self.service.files().get_media(fileId=file)
+            with io.BytesIO() as fh:
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while done is False:
+                    status, done = downloader.next_chunk()
+                    self.print("Download %d%%." % int(status.progress() * 100), debug=True)
+                
+                if return_bytes:
+                    content.append(fh.read())
+                else:
+                    content.append(io.StringIO(fh.getvalue().decode()))
+                file_count += 1
+
+        printProgressBar(file_count, len(file_id), prefix = 'Progress:', suffix = 'Complete', length = 50)
+        return content[0] if return_string else content
     
+
     def save_locally(self, bytes_string, path):
         if isinstance(bytes_string, bytes):
             # if self.download return_bytes was set True
@@ -245,6 +273,13 @@ class Drive(Logs):
         
         self.print(f"File saved to {file_path}")
         return file_path
+
+# def get_new_token():
+#     flow = InstalledAppFlow.from_client_secrets_file(api_key_path, self.SCOPES)
+#         creds = flow.run_local_server(port=0)
+#         Save the credentials for the next run
+#         with open(self.TOKEN_PATH, 'w') as token:
+#         token.write(creds.to_json())
 
 
 if __name__ == '__main__':
