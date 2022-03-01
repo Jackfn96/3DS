@@ -21,6 +21,7 @@ class Drive(Logs):
     # Folders always to be excluded from Google Drive search
     EXCLUDED_FOLDERS = ['échantillon']
     TOKEN_PATH = os.path.abspath(os.path.join(__file__, '..', '..', 'token.json'))
+    API_KEY_PATH = os.path.abspath(os.path.join(__file__, '..', '..', '3ds_gcloud_api.json'))
 
     def __init__(self, exclude=[], debug=False):
         """
@@ -44,12 +45,17 @@ class Drive(Logs):
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 # Try to refresh the token
-                creds.refresh(Request())
                 try:
-                    with open(self.TOKEN_PATH, 'w') as token:
-                        token.write(creds.to_json())
-                except OSError:
-                    self.print('Cannot save token')
+                    creds.refresh(Request())
+                except:
+                    creds = self.get_new_token()
+            else :
+                creds = self.get_new_token()
+            try:
+                with open(self.TOKEN_PATH, 'w') as token:
+                    token.write(creds.to_json())
+            except OSError:
+                self.print('Cannot save token')
 
         if not creds or not creds.valid:
             # Refresh unsuccessful
@@ -82,6 +88,23 @@ class Drive(Logs):
         elif env_token:
             return Credentials.from_authorized_user_info(json.loads(env_token), self.SCOPES)
         return None
+
+    def get_new_token(self):
+        api_key = os.getenv('GCLOUD_API_CODE')
+
+        if os.path.exists(self.API_KEY_PATH):
+            flow = InstalledAppFlow.from_client_secrets_file(self.API_KEY_PATH, self.SCOPES)
+        elif api_key:
+            flow = InstalledAppFlow.from_client_config(api_key, self.SCOPES)
+        else:
+            return None
+
+        creds = flow.run_local_server(port=0)
+        #Save the credentials for the next run
+        with open(self.TOKEN_PATH, 'w') as token:
+            token.write(creds.to_json())
+        
+        return creds
 
 
     def list(self, file_type, add_query=None, entire_drive=False):
@@ -258,12 +281,7 @@ class Drive(Logs):
         self.print(f"File saved to {file_path}")
         return file_path
 
-# def get_new_token():
-#     flow = InstalledAppFlow.from_client_secrets_file(api_key_path, self.SCOPES)
-#         creds = flow.run_local_server(port=0)
-#         Save the credentials for the next run
-#         with open(self.TOKEN_PATH, 'w') as token:
-#         token.write(creds.to_json())
+
 
 
 if __name__ == '__main__':
