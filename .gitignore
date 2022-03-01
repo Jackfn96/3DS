@@ -10,3 +10,4 @@ raw_data/
 .keep
 token.json
 3ds_gcloud_api.json
+data/
