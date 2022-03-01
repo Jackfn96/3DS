@@ -50,7 +50,6 @@ class HRV(Logs):
     
 
     def get_dataframes(self):
-        self.dict_hrv_files
         df_list = {}
         index = 0
 
@@ -60,8 +59,7 @@ class HRV(Logs):
                 file_id = list(self.files_df[self.files_df.name == sensor].id)[0]
                 files.append({'id': file_id, 'name': sensor, 'sensor_type': index})
             index += 1
-    
-        files_content = self.drive.download([file['id'] for file in files])
+        files_content = self.drive.download([file['id'] for file in files][:5])
         index = 0
         for file in files_content:
             df = pd.read_csv(file, sep=";", header=None, names=self.dict_hrv_files['headers_type'][files[index]['sensor_type']])
