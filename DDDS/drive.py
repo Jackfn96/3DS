@@ -1,5 +1,5 @@
 """
-Reading data from Google Drive
+Reading data from Google Drive 
 """
 
 from os import environ
@@ -8,7 +8,6 @@ import io
 import json
 from dotenv import load_dotenv
 from DDDS.utils import Logs
-from DDDS.utils import printProgressBar
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -22,6 +21,7 @@ class Drive(Logs):
     # Folders always to be excluded from Google Drive search
     EXCLUDED_FOLDERS = ['échantillon']
     TOKEN_PATH = os.path.abspath(os.path.join(__file__, '..', '..', 'token.json'))
+    API_KEY_PATH = os.path.abspath(os.path.join(__file__, '..', '..', '3ds_gcloud_api.json'))
 
     def __init__(self, exclude=[], debug=False):
         """
@@ -45,12 +45,17 @@ class Drive(Logs):
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 # Try to refresh the token
-                creds.refresh(Request())
                 try:
-                    with open(self.TOKEN_PATH, 'w') as token:
-                        token.write(creds.to_json())
-                except OSError:
-                    self.print('Cannot save token')
+                    creds.refresh(Request())
+                except:
+                    creds = self.get_new_token()
+            else :
+                creds = self.get_new_token()
+            try:
+                with open(self.TOKEN_PATH, 'w') as token:
+                    token.write(creds.to_json())
+            except OSError:
+                self.print('Cannot save token')
 
         if not creds or not creds.valid:
             # Refresh unsuccessful
@@ -83,6 +88,23 @@ class Drive(Logs):
         elif env_token:
             return Credentials.from_authorized_user_info(json.loads(env_token), self.SCOPES)
         return None
+
+    def get_new_token(self):
+        api_key = os.getenv('GCLOUD_API_CODE')
+
+        if os.path.exists(self.API_KEY_PATH):
+            flow = InstalledAppFlow.from_client_secrets_file(self.API_KEY_PATH, self.SCOPES)
+        elif api_key:
+            flow = InstalledAppFlow.from_client_config(api_key, self.SCOPES)
+        else:
+            return None
+
+        creds = flow.run_local_server(port=0)
+        #Save the credentials for the next run
+        with open(self.TOKEN_PATH, 'w') as token:
+            token.write(creds.to_json())
+        
+        return creds
 
 
     def list(self, file_type, add_query=None, entire_drive=False):
@@ -226,37 +248,22 @@ class Drive(Logs):
     def download(self, file_id, return_bytes=False):
         """
         Downloads file from Google Drive
+        by default returns string content
+        return_bytes=True returns bytes file content (for non-text files)
         """
-        # Legacy compatibility, file_id can be string of one ID or list of IDs
-        return_string = False
-        if isinstance(file_id, str):
-            file_id = [file_id]
-            return_string = True
+        request = self.service.files().get_media(fileId=file_id)
+        with io.BytesIO() as fh:
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
+                self.print("Download %d%%." % int(status.progress() * 100), debug=True)
+            
+            if return_bytes:
+                return fh.getvalue()
 
-        content = []
-        file_count = 0
-
-        for file in file_id:
-            printProgressBar(file_count, len(file_id), prefix = 'Progress:', suffix = 'Complete', length = 50)
-
-            request = self.service.files().get_media(fileId=file)
-            with io.BytesIO() as fh:
-                downloader = MediaIoBaseDownload(fh, request)
-                done = False
-                while done is False:
-                    status, done = downloader.next_chunk()
-                    self.print("Download %d%%." % int(status.progress() * 100), debug=True)
-                
-                if return_bytes:
-                    content.append(fh.read())
-                else:
-                    content.append(io.StringIO(fh.getvalue().decode()))
-                file_count += 1
-
-        printProgressBar(file_count, len(file_id), prefix = 'Progress:', suffix = 'Complete', length = 50)
-        return content[0] if return_string else content
+            return io.StringIO(fh.getvalue().decode())
     
-
     def save_locally(self, bytes_string, path):
         if isinstance(bytes_string, bytes):
             # if self.download return_bytes was set True
@@ -274,12 +281,7 @@ class Drive(Logs):
         self.print(f"File saved to {file_path}")
         return file_path
 
-# def get_new_token():
-#     flow = InstalledAppFlow.from_client_secrets_file(api_key_path, self.SCOPES)
-#         creds = flow.run_local_server(port=0)
-#         Save the credentials for the next run
-#         with open(self.TOKEN_PATH, 'w') as token:
-#         token.write(creds.to_json())
+
 
 
 if __name__ == '__main__':
