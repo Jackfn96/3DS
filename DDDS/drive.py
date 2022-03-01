@@ -1,5 +1,5 @@
 """
-Reading data from Google Drive
+Reading data from Google Drive 
 """
 
 from os import environ
@@ -7,7 +7,7 @@ import os.path
 import io
 import json
 from dotenv import load_dotenv
-from DDDS.logs import Logs
+from DDDS.utils import Logs
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
