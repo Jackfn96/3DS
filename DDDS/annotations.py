@@ -1,4 +1,5 @@
 import re
+from DDDS.hrv import HRV
 from cv2 import add
 import pandas as pd
 from DDDS.utils import Logs, printProgressBar
@@ -81,3 +82,36 @@ class Annotations(Logs):
         Returns tuple of date in HRV format and driver id
         """
         return f"{date_time_id[2]}_{date_time_id[1]}_{date_time_id[0]}", date_time_id[5]
+    
+    ### !!! NEED TO ADD THESE 2 FUNCTIONS IN TO THE MODULE
+
+    # def get_hrv_id(self, date, driver):
+    #     """
+    #     Returns key in hrv.dataframes dictionary corresponding to date and driver
+    #     """
+    #     for key in HRV.dataframes.keys():
+    #         if date in key and driver in key:
+    #             return key
+    
+    # def get_combined_dfs(self):
+    #     self.keys = []
+    #     for i in range(len(self.dates_drivers)):
+    #         self.keys.append(self.get_hrv_id(*self.dates_drivers[i]))
+        
+    #     self.hrv_dataframes = [self.dataframes[key] for key in self.keys]
+
+    #     self.annotation_dataframes = []
+    #     for i in range(len(self.annotations)):
+    #         self.annotation_dataframes.append(self.annotations[i])
+
+    #     self.combined_dfs = []
+
+    #     for hrv, annot in zip(self.hrv_dataframes, self.annotation_dataframes):
+    #         df = pd.concat([hrv, annot], ignore_index=True)
+    #         df = df.sort_values('Timestamp_Google')
+    #         df = df.reset_index()
+    #         df = df.drop(columns=['index', 'Timestamp_Device'], errors='ignore')
+    #         self.combined_dfs.append(df)
+        
+    #     return self.combined_dfs
+    
