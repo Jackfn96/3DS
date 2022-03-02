@@ -1,5 +1,5 @@
-import os, glob
 import pandas as pd
+import numpy as np
 from DDDS.utils import Logs
 from DDDS.drive import Drive
 
@@ -13,11 +13,20 @@ class HRV(Logs):
 
     
     def get_files_list(self):
+        """
+        Returns a list of HRV file names
+        """
         files_list = self.drive.list('txt')
         self.files_df = pd.DataFrame(files_list)
         return list(self.files_df.name)
     
+
     def split_lists(self, list_hrv_files):
+        """
+        Splits a list 'per sensor type'
+        Returns dictionary
+        'sensors_list' - list of
+        """
         # Create two lists from the list of HRV files - 1 for simple sensor & 1 for garmin sensor
         list_hrv_files_simple_sensor = [elem for elem in list_hrv_files if elem.find('garmin') == -1]
         list_hrv_files_garmin = [elem for elem in list_hrv_files if elem.find('garmin') != -1]
@@ -59,7 +68,7 @@ class HRV(Logs):
                 file_id = list(self.files_df[self.files_df.name == sensor].id)[0]
                 files.append({'id': file_id, 'name': sensor, 'sensor_type': index})
             index += 1
-        files_content = self.drive.download([file['id'] for file in files][:5])
+        files_content = self.drive.download([file['id'] for file in files])
         index = 0
         for file in files_content:
             df = pd.read_csv(file, sep=";", header=None, names=self.dict_hrv_files['headers_type'][files[index]['sensor_type']])
@@ -72,32 +81,23 @@ class HRV(Logs):
             df_list[files[index]['name'].rstrip('.txt')] = df
             index += 1
 
-        self.dfataframes = df_list
+        self.dataframes = df_list
         return self.dataframes
     
 
-    def get_RR_series(self, ids):
-        return_list = True
-        #if only one ID provided
-        if not isinstance(id, list):
-            ids = [ids]
-            return_list = False
-        
-        for id in ids:
-            list_RR = []
+    def get_RR_series(self, id):
+        list_RR = []
 
-            # Every value is string of 1) empty list, 2) list with one 3-digit number or 3) list of two 3-digit numbers
-            # convert them to list of ints
-            for i in self.df_list[id].RR_rate:
-                if len(i) == 5:
-                    list_RR.append(int(i[1:4]))
-                elif len(i) == 10:
-                    list_RR.append(int(i[1:4]))
-                    list_RR.append(int(i[6:9]))
-                elif len(i) == 2:
-                    pass
-                else:
-                    raise ValueError('Value of RR_rate is not correct')
+        # Every value is string of 1) empty list, 2) list with one 3-digit number or 3) list of two 3-digit numbers
+        # convert them to list of ints
+        for RR_rate in self.dataframes[id].RR_rate:
+            if RR_rate == '[]':
+                # empty cell
+                continue
+            RR_rate = RR_rate.strip('[]')
+            list_RR += [int(number) for number in RR_rate.split(', ')]
+        
+        return np.array(list_RR), np.cumsum(list_RR)
         
 
 
@@ -108,10 +108,4 @@ class HRV(Logs):
         for timestamp in args:
             if timestamp in df.columns:
                 df[timestamp] = df[timestamp].apply(lambda x: pd.Timestamp(x, unit="ms"))
-        return df
-    
-    def drop_columns(self, df, *args):
-        # Allow to drop useless columns
-        for column in args:
-            df.drop(column, axis=1, inplace=True)
         return df
