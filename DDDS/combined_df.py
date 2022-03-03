@@ -27,6 +27,7 @@ class CombinedDFs(Logs):
             df = df.sort_values('Timestamp_Google')
             df = df.reset_index()
             df = df.drop(columns=['index', 'Timestamp_Device'], errors='ignore')
+            df = df.set_index('Timestamp_Google')
             self.combined_dfs.append(df)
         
         self.print('-- DONE --')
