@@ -3,12 +3,14 @@ pip>=9
 setuptools>=26
 twine
 wheel>=0.29
+opencv-python
 
 # data science
 numpy
 pandas
 scikit-learn
 jupyter
+
 # tests/linter
 black
 coverage
@@ -17,6 +19,7 @@ pytest
 yapf
 
 # API
+matlab
 # gcsfs
 # google-cloud-storage
 # mlflow
