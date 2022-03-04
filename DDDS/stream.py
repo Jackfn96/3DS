@@ -9,6 +9,7 @@ from io import StringIO
 from collections import deque
 from PIL import Image
 from DDDS.annotations import Annotations
+from DDDS.hrv import HRV
 
 FRAMES_PER_SECOND = 30
 
@@ -40,12 +41,12 @@ def st_stdout(dst):
     with st_redirect(sys.stdout, dst):
         yield
 
-
 @contextmanager
 def st_stderr(dst):
     with st_redirect(sys.stderr, dst):
         yield
 
+### SESSUIB STATE ###
 
 if 'frame_no' not in st.session_state:
     # First time loading, frame number set to zero
@@ -61,7 +62,7 @@ if 'last_frame' not in st.session_state:
     _, frame = st.session_state.capture.read()
     st.session_state.frame_no += 1
     st.session_state.last_frame = Image.fromarray(frame)
-if 'annots_module' not in st.session_state:
+if 'annotations' not in st.session_state:
     with st_stdout('code'):
         annotations = Annotations()
     video_annotations = annotations.annotations[1].set_index('Instant')
@@ -70,50 +71,72 @@ if 'annots_module' not in st.session_state:
     seconds = seconds - minutes*60
     time = [f"{int(minute)}:{int(second)}" for minute, second in zip(minutes, seconds)]
     video_annotations['time_lapsed'] = time
-    st.session_state.annots_module = video_annotations
+    st.session_state.annotations = video_annotations
+if 'events' not in st.session_state:
+    st.session_state.events = []
+if 'hrv' not in st.session_state:
+    hrv = HRV()
+    with st_stdout('code'):
+        hrv.get_dataframes()
+    data =  hrv.get_RR_series('22_11_2021_15_38 eb0')
+    st.session_state.hrv = pd.DataFrame(data[0], index=data[1])
     
-    
-### SIDEBAR SETTINGS ###
 
-# How many frames to be skipped
+    
+frame_no = st.session_state.frame_no
+instant = st.session_state.instant
+capture = st.session_state.capture
+last_frame = st.session_state.last_frame
+annotations = st.session_state.annotations
+
+### SIDEBAR ###
 skip_frames = st.sidebar.number_input('Skip frames', 1, 500, 29)
-
 play = st.sidebar.checkbox('Play / pause')
 
-### DISPLAY SECTION ###
-DISPLAY_ANNOTS = 20_000 #ms
+
+### TOP INFO DISPLAY ###
+frame_no_text = st.text(f"Frame number {frame_no}")
+instant_text = st.text(f"Instant: {round(instant)}")
 
 
-frame_no = st.empty()
-frame_no.text(f"Frame number {st.session_state.frame_no}")
+### LEFT SCREEN ###
+columns = st.columns(2)
+with columns[1]:
+    
+    event_container = st.container()
+    with event_container:
+        for time_lapsed, event in st.session_state.events:
+            st.code(f"{time_lapsed} | {event}")
 
-instant = st.empty()
-instant.text(f"Instant: {round(st.session_state.instant)}")
+### RIGHT SCREEN ###
+with columns[0]:
+    video = st.image(last_frame)
 
-video_annotations = st.session_state.annots_module
-annot_container = st.empty()
-
-video = st.image(st.session_state.last_frame)
-
-
+### GRAPH CONTAINER ###
+graph_container = st.container()
+with graph_container:
+    st.line_chart(st.session_state.hrv[0], use_container_width=True)
 
 while play:
-    play, frame = st.session_state.capture.read()
+    play, frame = capture.read()
     frame_image = Image.fromarray(frame)
+    st.session_state.frame_no += 1
     if st.session_state.frame_no % skip_frames == 0:
         video.image(frame_image)
     
-    st.session_state.frame_no += 1
-    frame_no.text(f"Frame number {st.session_state.frame_no}")
+    
+    frame_no_text.text(f"Frame number {st.session_state.frame_no}")
 
     st.session_state.instant = st.session_state.frame_no * 1_000/FRAMES_PER_SECOND # 30fps so 1 frame is 1/30sec
-    instant.text(f"Instant: {round(st.session_state.instant)}")
+    instant_text.text(f"Instant: {round(st.session_state.instant)}")
 
-    new_annotations = video_annotations.loc[st.session_state.instant-DISPLAY_ANNOTS:st.session_state.instant][['time_lapsed', 'evenement']]
-    if len(new_annotations)>0:
-        time, event = new_annotations.iloc[0]
-        annot_container.code(f"{time} | {event}")
-    else:
-        annot_container.empty()
+    annotations_to_display = annotations.loc[:st.session_state.instant]
+    for row in annotations_to_display.iterrows():
+        event = (row[1]['time_lapsed'], row[1]['evenement'])
+        if event not in st.session_state.events:
+            st.session_state.events.append(event)
+            with event_container:
+                st.code(f"{event[0]} | {event[1]}")
+            
 
     st.session_state.last_frame = frame_image
