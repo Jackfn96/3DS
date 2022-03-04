@@ -9,9 +9,9 @@ class CombinedDFs(Logs):
 
         # Create instances of both classes
         self.print('-- Loading annotations --')
-        annotations = Annotations()
+        self.annotations = Annotations()
         self.print('-- Loading HRV --')
-        hrv = HRV()
+        self.hrv = HRV()
         self.hrv_dfs = hrv.get_dataframes()
 
         # Get a list of HRV keys corresponding to Annotation DF
