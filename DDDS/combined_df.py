@@ -12,13 +12,13 @@ class CombinedDFs(Logs):
         self.annotations = Annotations()
         self.print('-- Loading HRV --')
         self.hrv = HRV()
-        self.hrv_dfs = hrv.get_dataframes()
+        self.hrv_dfs = self.hrv.get_dataframes()
 
         # Get a list of HRV keys corresponding to Annotation DF
         keys = []
         for date, driver in self.annotations.dates_drivers:
             keys.append(self.get_hrv_id(date, driver))
-        hrv_dfs_ordered = [hrv.dataframes[key] for key in keys]
+        hrv_dfs_ordered = [self.hrv.dataframes[key] for key in keys]
 
         # Combine
         self.combined_dfs = []
