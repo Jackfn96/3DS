@@ -1,5 +1,5 @@
 """
-Reading data from Google Drive
+Reading data from Google Drive 
 """
 
 from os import environ
@@ -7,7 +7,8 @@ import os.path
 import io
 import json
 from dotenv import load_dotenv
-from DDDS.logs import Logs
+from DDDS.utils import Logs
+from DDDS.utils import printProgressBar
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -225,22 +226,37 @@ class Drive(Logs):
     def download(self, file_id, return_bytes=False):
         """
         Downloads file from Google Drive
-        by default returns string content
-        return_bytes=True returns bytes file content (for non-text files)
         """
-        request = self.service.files().get_media(fileId=file_id)
-        with io.BytesIO() as fh:
-            downloader = MediaIoBaseDownload(fh, request)
-            done = False
-            while done is False:
-                status, done = downloader.next_chunk()
-                self.print("Download %d%%." % int(status.progress() * 100), debug=True)
-            
-            if return_bytes:
-                return fh.getvalue()
+        # Legacy compatibility, file_id can be string of one ID or list of IDs
+        return_string = False
+        if isinstance(file_id, str):
+            file_id = [file_id]
+            return_string = True
 
-            return io.StringIO(fh.getvalue().decode())
+        content = []
+        file_count = 0
+
+        for file in file_id:
+            printProgressBar(file_count, len(file_id), prefix = 'Progress:', suffix = 'Complete', length = 50)
+
+            request = self.service.files().get_media(fileId=file)
+            with io.BytesIO() as fh:
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while done is False:
+                    status, done = downloader.next_chunk()
+                    self.print("Download %d%%." % int(status.progress() * 100), debug=True)
+                
+                if return_bytes:
+                    content.append(fh.read())
+                else:
+                    content.append(io.StringIO(fh.getvalue().decode()))
+                file_count += 1
+
+        printProgressBar(file_count, len(file_id), prefix = 'Progress:', suffix = 'Complete', length = 50)
+        return content[0] if return_string else content
     
+
     def save_locally(self, bytes_string, path):
         if isinstance(bytes_string, bytes):
             # if self.download return_bytes was set True
