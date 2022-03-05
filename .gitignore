@@ -4,6 +4,9 @@
 .DS_Store
 raw_data/
 *.csv
+*.h5
+*.jpg
+*.png
 **/__pycache__/
 .env
 .python-version
