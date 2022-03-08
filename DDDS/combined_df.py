@@ -18,11 +18,11 @@ class CombinedDFs(Logs):
         keys = []
         for date, driver in annotations.dates_drivers:
             keys.append(self.get_hrv_id(date, driver))
-        hrv_dfs_ordered = [hrv.dataframes[key] for key in keys]
+        self.hrv_dfs_ordered = [hrv.dataframes[key] for key in keys]
 
         # Combine
         self.combined_dfs = []
-        for hrv, annot in zip(hrv_dfs_ordered, annotations.annotations):
+        for hrv, annot in zip(self.hrv_dfs_ordered, annotations.annotations):
             df = pd.concat([hrv, annot], ignore_index=True)
             df = df.sort_values('Timestamp_Google')
             df = df.reset_index()
