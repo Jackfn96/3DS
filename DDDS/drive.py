@@ -22,6 +22,7 @@ class Drive(Logs):
     # Folders always to be excluded from Google Drive search
     EXCLUDED_FOLDERS = ['échantillon']
     TOKEN_PATH = os.path.abspath(os.path.join(__file__, '..', '..', 'token.json'))
+    API_KEY_PATH = os.path.abspath(os.path.join(__file__, '..', '..', '3ds_gcloud_api.json'))
 
     def __init__(self, exclude=[], debug=False):
         """
@@ -35,7 +36,7 @@ class Drive(Logs):
         self.ids = []
 
         # set file paths
-        api_key_path = os.path.abspath(os.path.join(__file__, '..', '..', '3ds_gcloud_api.json'))
+        
         
         # Check for local authentication token
         creds = self.get_credentials()
@@ -46,11 +47,15 @@ class Drive(Logs):
             if creds and creds.expired and creds.refresh_token:
                 # Try to refresh the token
                 creds.refresh(Request())
-                try:
-                    with open(self.TOKEN_PATH, 'w') as token:
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(self.API_KEY_PATH, self.SCOPES)
+                creds = flow.run_local_server(port=0)
+            # Save the credentials for the next run
+            try:
+                with open(self.TOKEN_PATH, 'w') as token:
                         token.write(creds.to_json())
-                except OSError:
-                    self.print('Cannot save token')
+            except OSError:
+                self.print('Cannot save token')
 
         if not creds or not creds.valid:
             # Refresh unsuccessful
