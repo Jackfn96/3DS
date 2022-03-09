@@ -11,4 +11,4 @@ data/
 token.json
 3ds_gcloud_api.json
 data/
-models/
+models/*
