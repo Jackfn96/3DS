@@ -1,4 +1,5 @@
 import os, sys
+import threading
 import numpy as np
 import pandas as pd
 import cv2 as cv
@@ -8,12 +9,15 @@ from threading import current_thread
 from io import StringIO
 from PIL import Image
 from DDDS.combined_df import CombinedDFs
-from DDDS.annotations import Annotations
-from DDDS.hrv import HRV
+from mtcnn import MTCNN
+from DDDS.face import build_model, face_detect
+
 
 FRAMES_PER_SECOND = 30
 HRV_GRAPH_DURIATION = 100_000 #ms
 
+
+### HANDLING TERMINAL OUTPUT ### 
 @contextmanager
 def st_redirect(src, dst):
     placeholder = st.empty()
@@ -41,12 +45,13 @@ def st_stdout(dst):
     with st_redirect(sys.stdout, dst):
         yield
 
-@contextmanager
-def st_stderr(dst):
-    with st_redirect(sys.stderr, dst):
-        yield
+# @contextmanager
+# def st_stderr(dst):
+#     with st_redirect(sys.stderr, dst):
+#         yield
 
-### SESSUIB STATE ###
+
+### SESSION STATE ###
 
 if 'frame_no' not in st.session_state:
     # First time loading, frame number set to zero
@@ -57,7 +62,7 @@ if 'instant' not in st.session_state:
 
 if 'capture' not in st.session_state:
     # If video has not been loaded yet
-    video_path = os.path.abspath('data/2021-11-22 15-40-50 eb0.flv')
+    video_path = os.path.abspath('data/2021-11-22_15-40-50_eb0.flv')
     st.session_state.capture = cv.VideoCapture(video_path)
 
 if 'last_frame' not in st.session_state:
@@ -102,12 +107,19 @@ if 'hrv' not in st.session_state:
     data['CumSum'] = data['CumSum'] - instant_offset
     st.session_state.hrv = data.set_index('CumSum').loc[0:]
 
+if 'KSS_probas' not in st.session_state or 'KSS_model' not in st.session_state:
+    st.session_state.KSS_probas = pd.DataFrame([0,1,0,0,0,0,0,0,0], columns=['KSS value'])
+    st.session_state.KSS_model = build_model()
+    st.session_state.MTCNN = MTCNN()
+
 
 frame_no = st.session_state.frame_no
 instant = st.session_state.instant
 capture = st.session_state.capture
 last_frame = st.session_state.last_frame
 annotations = st.session_state.annotations
+KSS_model = st.session_state.KSS_model
+
 
 ### SIDEBAR ###
 skip_frames = st.sidebar.number_input('Skip frames', 1, 500, 29)
@@ -128,19 +140,31 @@ with columns[1]:
         for time_lapsed, event in st.session_state.events:
             st.code(f"{time_lapsed} | {event}")
 
+
 ### RIGHT SCREEN ###
 with columns[0]:
     video = st.image(last_frame)
 
-### GRAPH CONTAINER ###
-graph_container = st.empty()
-with graph_container:
-    begin = instant - HRV_GRAPH_DURIATION
-    if begin < 0:
-        begin = 0
-    end = instant
-    st.line_chart(st.session_state.hrv['RR'].loc[begin:end])
 
+### GRAPH CONTAINER ###
+def refresh_graph(instant, hrv, container):
+            begin = instant - HRV_GRAPH_DURIATION
+            if begin < 0:
+                begin = 0
+            end = instant
+            container.line_chart(hrv['RR'].loc[begin:end])
+
+graph_container = st.empty()
+refresh_graph(st.session_state.instant, st.session_state.hrv, graph_container)
+
+
+### KSS CONTAINER ###
+kss_container = st.empty()
+with kss_container:
+    st.bar_chart(st.session_state.KSS_probas)
+
+
+### VIDEO PLAYING ###
 while play:
     play, frame = capture.read()
     frame_image = Image.fromarray(frame)
@@ -151,11 +175,16 @@ while play:
         video.image(frame_image)
 
         # GRAPH CONTAINER
-        begin = st.session_state.instant - HRV_GRAPH_DURIATION
-        if begin < 0:
-            begin = 0
-        end = st.session_state.instant
-        graph_container.line_chart(st.session_state.hrv['RR'].loc[begin:end])
+        refresh_graph(st.session_state.instant, st.session_state.hrv, graph_container)
+
+        # KSS detection
+        crop_frame = face_detect(frame, st.session_state.MTCNN)
+        if crop_frame is None:
+            continue
+        KSS_probas = KSS_model.predict(np.expand_dims(crop_frame, axis=0))[0]
+        st.session_state.KSS_probas = pd.DataFrame(KSS_probas, columns=['KSS value'])
+        with kss_container:
+            st.bar_chart(st.session_state.KSS_probas)
     
     
     frame_no_text.text(f"Frame number {st.session_state.frame_no}")
