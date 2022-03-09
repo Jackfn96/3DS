@@ -1,5 +1,4 @@
 import os, sys
-import threading
 import numpy as np
 import pandas as pd
 import cv2 as cv
@@ -15,7 +14,6 @@ from DDDS.face import build_model, face_detect
 
 FRAMES_PER_SECOND = 30
 HRV_GRAPH_DURIATION = 100_000 #ms
-
 
 ### HANDLING TERMINAL OUTPUT ### 
 @contextmanager
@@ -139,7 +137,6 @@ with columns[1]:
     with event_container:
         for time_lapsed, event in st.session_state.events:
             st.code(f"{time_lapsed} | {event}")
-
 
 ### RIGHT SCREEN ###
 with columns[0]:
