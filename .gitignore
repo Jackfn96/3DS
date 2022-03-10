@@ -2,7 +2,7 @@
 .coverage
 .ipynb_checkpoints
 .DS_Store
-raw_data/
+data/
 *.csv
 **/__pycache__/
 .env
@@ -11,3 +11,4 @@ raw_data/
 token.json
 3ds_gcloud_api.json
 data/
+models/*
