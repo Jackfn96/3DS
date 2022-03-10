@@ -60,7 +60,7 @@ def face_detect(frame, mtcnn):
     faces = mtcnn.detect_faces(frame)
     # check if detected faces
     if (len(faces) == 0):
-        return  0
+        return
     bounding_box = bounding_box_check(faces, x, y)
     if (bounding_box == None):
         print('face is not related to given coord')

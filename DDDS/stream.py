@@ -105,8 +105,10 @@ if 'hrv' not in st.session_state:
     data['CumSum'] = data['CumSum'] - instant_offset
     st.session_state.hrv = data.set_index('CumSum').loc[0:]
 
+KSS_columns = [str(x) for x in range(10)]
 if 'KSS_probas' not in st.session_state or 'KSS_model' not in st.session_state:
-    st.session_state.KSS_probas = pd.DataFrame([0,1,0,0,0,0,0,0,0], columns=['KSS value'])
+    print('Loading Neural Network...')
+    st.session_state.KSS_probas = pd.DataFrame([[0.2, 0.1, 0, 0, 0.4, 0, 0, 0.1, 0.2, 1]], columns=KSS_columns)
     st.session_state.KSS_model = build_model()
     st.session_state.MTCNN = MTCNN()
 
@@ -118,10 +120,18 @@ last_frame = st.session_state.last_frame
 annotations = st.session_state.annotations
 KSS_model = st.session_state.KSS_model
 
+def reload():
+    st.session_state.pop('frame_no')
+    st.session_state.pop('instant')
+    st.session_state.pop('capture')
+    st.session_state.pop('last_frame')
+    st.session_state.pop('KSS_probas')
 
 ### SIDEBAR ###
 skip_frames = st.sidebar.number_input('Skip frames', 1, 500, 29)
 play = st.sidebar.checkbox('Play / pause')
+st.sidebar.button('Reload', on_click=reload)
+
 
 
 ### TOP INFO DISPLAY ###
@@ -138,12 +148,13 @@ with columns[1]:
         for time_lapsed, event in st.session_state.events:
             st.code(f"{time_lapsed} | {event}")
 
+
 ### RIGHT SCREEN ###
 with columns[0]:
     video = st.image(last_frame)
 
 
-### GRAPH CONTAINER ###
+### HRV GRAPH CONTAINER ###
 def refresh_graph(instant, hrv, container):
             begin = instant - HRV_GRAPH_DURIATION
             if begin < 0:
@@ -156,10 +167,15 @@ refresh_graph(st.session_state.instant, st.session_state.hrv, graph_container)
 
 
 ### KSS CONTAINER ###
-kss_container = st.empty()
-with kss_container:
-    st.bar_chart(st.session_state.KSS_probas)
+def show_kss():
+    with kss_container:
+        st.bar_chart(st.session_state.KSS_probas.mean(axis=0))
+    # with pandas_container:
+    #             st.dataframe(st.session_state.KSS_probas)
 
+kss_container = st.empty()
+#pandas_container = st.empty()
+show_kss()
 
 ### VIDEO PLAYING ###
 while play:
@@ -179,9 +195,11 @@ while play:
         if crop_frame is None:
             continue
         KSS_probas = KSS_model.predict(np.expand_dims(crop_frame, axis=0))[0]
-        st.session_state.KSS_probas = pd.DataFrame(KSS_probas, columns=['KSS value'])
-        with kss_container:
-            st.bar_chart(st.session_state.KSS_probas)
+        # Add newest results and restrict to max 10 last measurements
+        st.session_state.KSS_probas = pd.concat([st.session_state.KSS_probas, pd.DataFrame([KSS_probas], columns=KSS_columns)])\
+                                        .tail(50)
+
+        show_kss()
     
     
     frame_no_text.text(f"Frame number {st.session_state.frame_no}")
