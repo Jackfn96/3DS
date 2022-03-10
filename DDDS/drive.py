@@ -255,7 +255,7 @@ class Drive(Logs):
                 if return_bytes:
                     content.append(fh.read())
                 else:
-                    content.append(io.StringIO(fh.getvalue().decode()))
+                    content.append(io.StringIO(fh.getvalue().decode(errors='ignore')))
                 file_count += 1
 
         printProgressBar(file_count, len(file_id), prefix = 'Progress:', suffix = 'Complete', length = 50)
