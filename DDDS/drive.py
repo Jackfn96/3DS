@@ -90,7 +90,7 @@ class Drive(Logs):
         return None
 
 
-    def list(self, file_type, add_query=None, entire_drive=True):
+    def list(self, file_type, add_query=None, entire_drive=False):
         """
         Lists items of selected type
         Query as per instruction in https://developers.google.com/drive/api/v3/ref-search-terms
