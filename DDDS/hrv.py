@@ -4,9 +4,9 @@ from DDDS.utils import Logs
 from DDDS.drive import Drive
 
 class HRV(Logs):
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, drive=None):
         super().__init__(debug)
-        self.drive = Drive()
+        self.drive = drive if drive else Drive()
 
         list_hrv_files = self.get_files_list()
         self.dict_hrv_files = self.split_lists(list_hrv_files)
