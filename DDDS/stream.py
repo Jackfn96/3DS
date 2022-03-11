@@ -15,6 +15,10 @@ from DDDS.face import build_model, face_detect
 FRAMES_PER_SECOND = 30
 HRV_GRAPH_DURIATION = 100_000 #ms
 
+
+### PAGE SETTINGS ###
+st.set_page_config(layout='wide')
+
 ### HANDLING TERMINAL OUTPUT ### 
 @contextmanager
 def st_redirect(src, dst):
@@ -60,7 +64,7 @@ if 'instant' not in st.session_state:
 
 if 'capture' not in st.session_state:
     # If video has not been loaded yet
-    video_path = os.path.abspath('data/2021-11-22_15-40-50_eb0.flv')
+    video_path = os.path.abspath('data/2021-11-18 13-21-41 e99.flv')
     st.session_state.capture = cv.VideoCapture(video_path)
 
 if 'last_frame' not in st.session_state:
@@ -75,7 +79,7 @@ if 'events' not in st.session_state:
 if 'df' not in st.session_state:
     with st_stdout('code'):
         dfs = CombinedDFs()
-        st.session_state.df = dfs.combined_dfs[1]
+        st.session_state.df = dfs.combined_dfs[30]
 
 if 'annotations' not in st.session_state:    
     # Select only annotations
@@ -88,7 +92,7 @@ if 'annotations' not in st.session_state:
     st.session_state.annotations = annotations
     
 if 'hrv' not in st.session_state:
-    data = dfs.hrv.get_RR_series('22_11_2021_15_38 eb0')
+    data = dfs.hrv.get_RR_series('18_11_2021_13_19 e99')
     data = pd.DataFrame({'RR':data[0], 'CumSum':data[1]})
 
     # Timestamp Google for instant=0
@@ -108,7 +112,7 @@ if 'hrv' not in st.session_state:
 KSS_columns = [str(x) for x in range(10)]
 if 'KSS_probas' not in st.session_state or 'KSS_model' not in st.session_state:
     print('Loading Neural Network...')
-    st.session_state.KSS_probas = pd.DataFrame([[0.2, 0.1, 0, 0, 0.4, 0, 0, 0.1, 0.2, 1]], columns=KSS_columns)
+    st.session_state.KSS_probas = pd.DataFrame([[0.2, 0.1, 0, 0, 0.4, 0, 0, 0.1, 0.2, 0]], columns=KSS_columns)
     st.session_state.KSS_model = build_model()
     st.session_state.MTCNN = MTCNN()
 
@@ -135,24 +139,32 @@ st.sidebar.button('Reload', on_click=reload)
 
 
 ### TOP INFO DISPLAY ###
-frame_no_text = st.text(f"Frame number {frame_no}")
-instant_text = st.text(f"Instant: {round(instant)}")
+def instant_to_time(instant):
+    td = pd.Timedelta(instant, unit='ms').components
+    with instant_text:
+        st.code(f"Time lapsed: {td.minutes}:{td.seconds}")
 
+instant_text = st.empty()
+instant_to_time(instant)
+
+
+### TOP SECTION ###
+columns_top = st.columns(2)
 
 ### LEFT SCREEN ###
-columns = st.columns(2)
-with columns[1]:
-    
+with columns_top[1]:
     event_container = st.container()
     with event_container:
         for time_lapsed, event in st.session_state.events:
             st.code(f"{time_lapsed} | {event}")
 
-
 ### RIGHT SCREEN ###
-with columns[0]:
+with columns_top[0]:
     video = st.image(last_frame)
 
+
+### BOTTOM SECTION ###
+columns_bottom = st.columns(2)
 
 ### HRV GRAPH CONTAINER ###
 def refresh_graph(instant, hrv, container):
@@ -162,20 +174,36 @@ def refresh_graph(instant, hrv, container):
             end = instant
             container.line_chart(hrv['RR'].loc[begin:end])
 
-graph_container = st.empty()
-refresh_graph(st.session_state.instant, st.session_state.hrv, graph_container)
-
+with columns_bottom[0]:
+    graph_container = st.empty()
+    refresh_graph(st.session_state.instant, st.session_state.hrv, graph_container)
 
 ### KSS CONTAINER ###
 def show_kss():
-    with kss_container:
-        st.bar_chart(st.session_state.KSS_probas.mean(axis=0))
-    # with pandas_container:
-    #             st.dataframe(st.session_state.KSS_probas)
+    # Calculate weighted average of results
+    average_scores = st.session_state.KSS_probas.mean(axis=0)
+    sum=0
+    for scale, score in average_scores.items():
+        sum += int(scale)*score
 
-kss_container = st.empty()
-#pandas_container = st.empty()
-show_kss()
+    with kss_bar:
+        st.progress(int(sum*10))
+    
+    with kss_label:
+        if sum > 7.5:
+            st.error('Drowsy')
+        elif sum > 4.5:
+            st.warning('Tired')
+        elif sum > 3.0:
+            st.info('Awake')
+        else:
+            st.success('Fully awake')
+
+with columns_bottom[1]:
+    kss_label = st.empty()
+    kss_bar = st.empty()
+    show_kss()
+
 
 ### VIDEO PLAYING ###
 while play:
@@ -201,9 +229,8 @@ while play:
 
         show_kss()
     
-    
-    frame_no_text.text(f"Frame number {st.session_state.frame_no}")
-    instant_text.text(f"Instant: {round(st.session_state.instant)}")
+    with instant_text:
+        instant_to_time(st.session_state.instant)
 
     annotations_to_display = annotations.loc[:st.session_state.instant]
     for row in annotations_to_display.iterrows():
