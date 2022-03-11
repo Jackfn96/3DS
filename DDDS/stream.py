@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import cv2 as cv
 import streamlit as st
+import matplotlib.pyplot as plt
 from contextlib import contextmanager
 from threading import current_thread
 from io import StringIO
@@ -10,10 +11,31 @@ from PIL import Image
 from DDDS.combined_df import CombinedDFs
 from mtcnn import MTCNN
 from DDDS.face import build_model, face_detect
+from DDDS.hrv import HRV
+
+### DATA SETTINGS ###
+VIDEO_PATH = 'data/2021-11-18 13-21-41 e99.flv'
+RR_SERIES_ID = '18_11_2021_13_19 e99'
+DF_NUMBER = 30
+
+### SETTINGS ###
+FRAMES_PER_SECOND = 30  # FPS of the original video. DO NOT CHANGE
+HRV_GRAPH_DURIATION = 60_000 # Duration of heart rate graph history (ms)
+HRV_GRAPH_YLIM = [600, 1200] # xLim of HRV graph
+KSS_LIMITS = {  'red': 7.5, # By default label is green. Set thresholds to turn blue, yellow and red
+                'yellow': 4.5,
+                'blue': 3.0}
+KSS_LABELS = ['Fully awake', 'Awake', 'Tired', 'Drowsy']    # Labels for KSS model display (correspond to colors)
+DISPLAY_EVENTS = 16 # Number if annotations to be displayed on screen
+plt.style.use("dark_background")
 
 
-FRAMES_PER_SECOND = 30
-HRV_GRAPH_DURIATION = 100_000 #ms
+### UTILITIES ###
+def get_time(td):
+    def double_digit(number):
+        return '0'+str(number) if number < 10 else number
+    
+    return f"{double_digit(td.minutes)}:{double_digit(td.seconds)}   +{td.hours} hrs"
 
 
 ### PAGE SETTINGS ###
@@ -64,8 +86,7 @@ if 'instant' not in st.session_state:
 
 if 'capture' not in st.session_state:
     # If video has not been loaded yet
-    video_path = os.path.abspath('data/2021-11-18 13-21-41 e99.flv')
-    st.session_state.capture = cv.VideoCapture(video_path)
+    st.session_state.capture = cv.VideoCapture(os.path.abspath(VIDEO_PATH))
 
 if 'last_frame' not in st.session_state:
     # Load the first frame
@@ -79,20 +100,19 @@ if 'events' not in st.session_state:
 if 'df' not in st.session_state:
     with st_stdout('code'):
         dfs = CombinedDFs()
-        st.session_state.df = dfs.combined_dfs[30]
+        st.session_state.df = dfs.combined_dfs[DF_NUMBER]
 
 if 'annotations' not in st.session_state:    
     # Select only annotations
-    df = st.session_state.df
+    df = st.session_state.df.copy()
     annotations = df[- df['Instant'].isna()].reset_index().set_index('Instant')[['evenement']]
-    seconds = pd.to_timedelta(annotations.index, unit='ms').seconds
-    minutes = np.floor(seconds / 60)
-    time = [f"{int(minute)}:{int(second)}" for minute, second in zip(minutes, seconds)]
+    tds = pd.to_timedelta(annotations.index, unit='ms')
+    time = [get_time(td.components) for td in tds]
     annotations['time_lapsed'] = time
     st.session_state.annotations = annotations
     
 if 'hrv' not in st.session_state:
-    data = dfs.hrv.get_RR_series('18_11_2021_13_19 e99')
+    data = dfs.hrv.get_RR_series(RR_SERIES_ID)
     data = pd.DataFrame({'RR':data[0], 'CumSum':data[1]})
 
     # Timestamp Google for instant=0
@@ -110,9 +130,10 @@ if 'hrv' not in st.session_state:
     st.session_state.hrv = data.set_index('CumSum').loc[0:]
 
 KSS_columns = [str(x) for x in range(10)]
-if 'KSS_probas' not in st.session_state or 'KSS_model' not in st.session_state:
-    print('Loading Neural Network...')
+if 'KSS_probas' not in st.session_state:
     st.session_state.KSS_probas = pd.DataFrame([[0.2, 0.1, 0, 0, 0.4, 0, 0, 0.1, 0.2, 0]], columns=KSS_columns)
+
+if  'KSS_model' not in st.session_state:
     st.session_state.KSS_model = build_model()
     st.session_state.MTCNN = MTCNN()
 
@@ -130,9 +151,10 @@ def reload():
     st.session_state.pop('capture')
     st.session_state.pop('last_frame')
     st.session_state.pop('KSS_probas')
+    st.session_state.pop('events')
 
 ### SIDEBAR ###
-skip_frames = st.sidebar.number_input('Skip frames', 1, 500, 29)
+skip_frames = st.sidebar.number_input('Skip frames', 1, 500, FRAMES_PER_SECOND)
 play = st.sidebar.checkbox('Play / pause')
 st.sidebar.button('Reload', on_click=reload)
 
@@ -142,7 +164,7 @@ st.sidebar.button('Reload', on_click=reload)
 def instant_to_time(instant):
     td = pd.Timedelta(instant, unit='ms').components
     with instant_text:
-        st.code(f"Time lapsed: {td.minutes}:{td.seconds}")
+        st.code(f"Time lapsed: {get_time(td)}")
 
 instant_text = st.empty()
 instant_to_time(instant)
@@ -151,16 +173,20 @@ instant_to_time(instant)
 ### TOP SECTION ###
 columns_top = st.columns(2)
 
-### LEFT SCREEN ###
-with columns_top[1]:
-    event_container = st.container()
-    with event_container:
-        for time_lapsed, event in st.session_state.events:
-            st.code(f"{time_lapsed} | {event}")
-
-### RIGHT SCREEN ###
+### VIDEO SCREEN ###
 with columns_top[0]:
     video = st.image(last_frame)
+
+### ANNOTATIONS SCREEN ###
+def refresh_annotations(events, annotations):
+    code = ""
+    for time_lapsed, event in events[DISPLAY_EVENTS:0:-1]:
+           code += f"{time_lapsed} | {event}\n"
+    annotations.code(code)
+
+with columns_top[1]:
+    annotations_list = st.empty()
+    refresh_annotations(st.session_state.events, annotations_list)
 
 
 ### BOTTOM SECTION ###
@@ -168,11 +194,21 @@ columns_bottom = st.columns(2)
 
 ### HRV GRAPH CONTAINER ###
 def refresh_graph(instant, hrv, container):
-            begin = instant - HRV_GRAPH_DURIATION
-            if begin < 0:
-                begin = 0
-            end = instant
-            container.line_chart(hrv['RR'].loc[begin:end])
+        begin = instant - HRV_GRAPH_DURIATION
+        if begin < 0:
+            begin = 0
+        end = instant
+        data = hrv['RR'].loc[begin:end]
+
+        fig, ax = plt.subplots(figsize=(10,5))
+        ax.plot(data)
+        ax.set_title('Hear Rate Variability')
+        ax.set_xticklabels([])
+        ax.set_ylabel('Variability')
+        ax.set_xlabel(f"Time [{int(HRV_GRAPH_DURIATION/1_000)} sec]")
+        ax.set_ylim(HRV_GRAPH_YLIM)
+        container.pyplot(fig)
+        fig.close()
 
 with columns_bottom[0]:
     graph_container = st.empty()
@@ -190,14 +226,14 @@ def show_kss():
         st.progress(int(sum*10))
     
     with kss_label:
-        if sum > 7.5:
-            st.error('Drowsy')
-        elif sum > 4.5:
-            st.warning('Tired')
-        elif sum > 3.0:
-            st.info('Awake')
+        if sum > KSS_LIMITS['red']:
+            st.error(KSS_LABELS[3])
+        elif sum > KSS_LIMITS['yellow']:
+            st.warning(KSS_LABELS[2])
+        elif sum > KSS_LIMITS['blue']:
+            st.info(KSS_LABELS[1])
         else:
-            st.success('Fully awake')
+            st.success(KSS_LABELS[0])
 
 with columns_bottom[1]:
     kss_label = st.empty()
@@ -237,9 +273,7 @@ while play:
         event = (row[1]['time_lapsed'], row[1]['evenement'])
         if event not in st.session_state.events:
             st.session_state.events.append(event)
-            with event_container:
-                st.code(f"{event[0]} | {event[1]}")
+    
+    refresh_annotations(st.session_state.events, annotations_list)
             
-
-
     st.session_state.last_frame = frame_image
