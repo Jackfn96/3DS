@@ -94,7 +94,7 @@ class HRV(Logs):
             if RR_rate == '[]':
                 # empty cell
                 continue
-            RR_rate = RR_rate.strip('[]')
+            RR_rate = str(RR_rate).strip('[]')
             list_RR += [int(number) for number in RR_rate.split(', ')]
         
         return np.array(list_RR), np.cumsum(list_RR)
