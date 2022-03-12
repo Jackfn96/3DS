@@ -14,14 +14,14 @@ from DDDS.face import build_model, face_detect
 from DDDS.hrv import HRV
 
 ### DATA SETTINGS ###
-VIDEO_PATH = 'data/2021-11-18 13-21-41 e99.flv'
-RR_SERIES_ID = '18_11_2021_13_19 e99'
-DF_NUMBER = 30
+VIDEO_PATH = 'data/red_or_green_line.avi'#2021-11-18 13-21-41 e99.flv'
+RR_SERIES_ID = '24_11_2021_15_34 e99'
+DF_NUMBER = 7
 
 ### SETTINGS ###
 FRAMES_PER_SECOND = 30  # FPS of the original video. DO NOT CHANGE
 HRV_GRAPH_DURIATION = 60_000 # Duration of heart rate graph history (ms)
-HRV_GRAPH_YLIM = [600, 1200] # xLim of HRV graph
+HRV_GRAPH_YLIM = [500, 1500] # xLim of HRV graph
 KSS_LIMITS = {  'red': 7.5, # By default label is green. Set thresholds to turn blue, yellow and red
                 'yellow': 4.5,
                 'blue': 3.0}
@@ -131,12 +131,14 @@ if 'hrv' not in st.session_state:
 
 KSS_columns = [str(x) for x in range(10)]
 if 'KSS_probas' not in st.session_state:
-    st.session_state.KSS_probas = pd.DataFrame([[0.2, 0.1, 0, 0, 0.4, 0, 0, 0.1, 0.2, 0]], columns=KSS_columns)
+    st.session_state.KSS_probas = pd.DataFrame([[0.0, 0.0, 0, 0, 0.0, 0, 0, 0.0, 0.0, 1]], columns=KSS_columns)
 
 if  'KSS_model' not in st.session_state:
     st.session_state.KSS_model = build_model()
     st.session_state.MTCNN = MTCNN()
 
+if 'face_detected' not in st.session_state:
+    st.session_state.face_detected = False
 
 frame_no = st.session_state.frame_no
 instant = st.session_state.instant
@@ -152,22 +154,37 @@ def reload():
     st.session_state.pop('last_frame')
     st.session_state.pop('KSS_probas')
     st.session_state.pop('events')
+    st.session_state.pop('face_detected')
 
 ### SIDEBAR ###
 skip_frames = st.sidebar.number_input('Skip frames', 1, 500, FRAMES_PER_SECOND)
 play = st.sidebar.checkbox('Play / pause')
-st.sidebar.button('Reload', on_click=reload)
-
+fast_forward = st.sidebar.checkbox('Fast forward')
+st.sidebar.write('---')
+st.sidebar.button('Restart', on_click=reload)
 
 
 ### TOP INFO DISPLAY ###
-def instant_to_time(instant):
-    td = pd.Timedelta(instant, unit='ms').components
-    with instant_text:
-        st.code(f"Time lapsed: {get_time(td)}")
+columns_header = st.columns(2)
+with columns_header[0]:
+    def show_face_detection():
+        with face_detect_indicator:
+            if st.session_state.face_detected:
+                st.success('Face detected')
+            else:
+                st.warning('No face detected')
 
-instant_text = st.empty()
-instant_to_time(instant)
+    face_detect_indicator = st.empty()
+    show_face_detection()
+
+with columns_header[1]:
+    def instant_to_time(instant):
+        td = pd.Timedelta(instant, unit='ms').components
+        with instant_text:
+            st.code(f"Time lapsed: {get_time(td)}")
+
+    instant_text = st.empty()
+    instant_to_time(instant)
 
 
 ### TOP SECTION ###
@@ -180,7 +197,8 @@ with columns_top[0]:
 ### ANNOTATIONS SCREEN ###
 def refresh_annotations(events, annotations):
     code = ""
-    for time_lapsed, event in events[DISPLAY_EVENTS:0:-1]:
+    # Show last elements and reverse order
+    for time_lapsed, event in events[-DISPLAY_EVENTS:][::-1]:
            code += f"{time_lapsed} | {event}\n"
     annotations.code(code)
 
@@ -248,7 +266,9 @@ while play:
     st.session_state.frame_no += 1
     st.session_state.instant = st.session_state.frame_no * 1_000/FRAMES_PER_SECOND # 30fps so 1 frame is 1/30sec
     
-    if st.session_state.frame_no % skip_frames == 0:
+    if st.session_state.frame_no % skip_frames == 0 and not fast_forward:
+        # Render frame
+        
         video.image(frame_image)
 
         # GRAPH CONTAINER
@@ -257,13 +277,17 @@ while play:
         # KSS detection
         crop_frame = face_detect(frame, st.session_state.MTCNN)
         if crop_frame is None:
+            st.session_state.face_detected = False
             continue
+        st.session_state.face_detected = True
+
         KSS_probas = KSS_model.predict(np.expand_dims(crop_frame, axis=0))[0]
         # Add newest results and restrict to max 10 last measurements
         st.session_state.KSS_probas = pd.concat([st.session_state.KSS_probas, pd.DataFrame([KSS_probas], columns=KSS_columns)])\
                                         .tail(50)
 
         show_kss()
+    show_face_detection()
     
     with instant_text:
         instant_to_time(st.session_state.instant)
