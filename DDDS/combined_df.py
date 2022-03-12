@@ -1,5 +1,6 @@
 import pandas as pd
 from DDDS.utils import Logs
+from DDDS.drive import Drive
 from DDDS.annotations import Annotations
 from DDDS.hrv import HRV
 
@@ -7,11 +8,12 @@ class CombinedDFs(Logs):
     def __init__(self, debug=False):
         super().__init__(debug)
 
+        drive = Drive()
         # Create instances of both classes
         self.print('-- Loading annotations --')
-        self.annotations = Annotations()
+        self.annotations = Annotations(drive=drive)
         self.print('-- Loading HRV --')
-        self.hrv = HRV()
+        self.hrv = HRV(drive=drive)
         self.hrv_dfs = self.hrv.get_dataframes()
 
         # Get a list of HRV keys corresponding to Annotation DF
