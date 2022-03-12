@@ -27,7 +27,6 @@ KSS_LIMITS = {  'red': 7.5, # By default label is green. Set thresholds to turn 
                 'blue': 3.0}
 KSS_LABELS = ['Fully awake', 'Awake', 'Tired', 'Drowsy']    # Labels for KSS model display (correspond to colors)
 DISPLAY_EVENTS = 16 # Number if annotations to be displayed on screen
-plt.style.use("dark_background")
 
 
 ### UTILITIES ###
@@ -40,6 +39,7 @@ def get_time(td):
 
 ### PAGE SETTINGS ###
 st.set_page_config(layout='wide')
+plt.style.use("dark_background")
 
 ### HANDLING TERMINAL OUTPUT ### 
 @contextmanager
@@ -208,7 +208,7 @@ def refresh_graph(instant, hrv, container):
         ax.set_xlabel(f"Time [{int(HRV_GRAPH_DURIATION/1_000)} sec]")
         ax.set_ylim(HRV_GRAPH_YLIM)
         container.pyplot(fig)
-        fig.close()
+        plt.close()
 
 with columns_bottom[0]:
     graph_container = st.empty()
