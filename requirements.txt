@@ -10,7 +10,6 @@ openpyxl
 pydot
 ffmpeg
 cmake
-dlib
 mlxtend
 mtcnn_opencv
 imageio
