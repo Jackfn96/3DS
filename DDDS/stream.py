@@ -11,12 +11,14 @@ from PIL import Image
 from DDDS.combined_df import CombinedDFs
 from mtcnn import MTCNN
 from DDDS.face import build_model, face_detect
-from DDDS.hrv import HRV
 
 ### DATA SETTINGS ###
 VIDEO_PATH = 'data/red_or_green_line.avi'#2021-11-18 13-21-41 e99.flv'
 RR_SERIES_ID = '24_11_2021_15_34 e99'
 DF_NUMBER = 7
+
+### MODEL SELECTION ###
+KSS_MODEL_VERSION = 'vgg16_model_5.h5'
 
 ### SETTINGS ###
 FRAMES_PER_SECOND = 30  # FPS of the original video. DO NOT CHANGE
@@ -134,7 +136,7 @@ if 'KSS_probas' not in st.session_state:
     st.session_state.KSS_probas = pd.DataFrame([[0.0, 0.0, 0, 0, 0.0, 0, 0, 0.0, 0.0, 1]], columns=KSS_columns)
 
 if  'KSS_model' not in st.session_state:
-    st.session_state.KSS_model = build_model()
+    st.session_state.KSS_model = build_model(KSS_MODEL_VERSION)
     st.session_state.MTCNN = MTCNN()
 
 if 'face_detected' not in st.session_state:
@@ -284,7 +286,7 @@ while play:
         KSS_probas = KSS_model.predict(np.expand_dims(crop_frame, axis=0))[0]
         # Add newest results and restrict to max 10 last measurements
         st.session_state.KSS_probas = pd.concat([st.session_state.KSS_probas, pd.DataFrame([KSS_probas], columns=KSS_columns)])\
-                                        .tail(50)
+                                        .tail(10)
 
         show_kss()
     show_face_detection()

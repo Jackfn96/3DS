@@ -27,7 +27,7 @@ from tensorflow.keras.optimizers import SGD
 
 # coordiante of the face (approximately center)
 FACE_CENTER = (1100, 200)
-MODEL_PATH = os.path.abspath(os.path.join(__file__, '..', '..', 'models', 'model_base.h5'))
+MODEL_PATH = os.path.abspath(os.path.join(__file__, '..', '..', 'models'))
 FACE_IMG_SIZE = (244, 244)
 
 
@@ -42,15 +42,15 @@ def bounding_box_check(faces, x, y):
             bounding_box[0] = 0
         if (bounding_box[0] - OFFSET > x
                 or bounding_box[0] + bounding_box[2] + OFFSET < x):
-            print('change person from')
-            print(bounding_box)
-            print('to')
+            # print('change person from')
+            # print(bounding_box)
+            # print('to')
             continue
         if (bounding_box[1] - OFFSET > y
                 or bounding_box[1] + bounding_box[3] + OFFSET < y):
-            print('change person from')
-            print(bounding_box)
-            print('to')
+            # print('change person from')
+            # print(bounding_box)
+            # print('to')
             continue
         return bounding_box
 
@@ -63,7 +63,7 @@ def face_detect(frame, mtcnn):
         return
     bounding_box = bounding_box_check(faces, x, y)
     if (bounding_box == None):
-        print('face is not related to given coord')
+        # print('face is not related to given coord')
         return
     crop_img = frame[bounding_box[1]:bounding_box[1] + bounding_box[3],
                    bounding_box[0]:bounding_box[0] + bounding_box[2]]
@@ -72,7 +72,7 @@ def face_detect(frame, mtcnn):
 
 
 
-def build_model():
+def build_model(model = 'model_base.h5'):
     # model_base = Sequential()
 
     # model_base.add(Conv2D(32, (3, 3), activation='relu',
@@ -99,6 +99,9 @@ def build_model():
     #             optimizer='adam',
     #             metrics=['accuracy'])
     
-    model_base = load_model(MODEL_PATH)
-
+    model_file = os.path.join(MODEL_PATH, model)
+    if not os.path.exists(model_file):
+        raise FileExistsError(f"Model file {model_file} doesn't exists")
+    
+    model_base = load_model()
     return model_base
