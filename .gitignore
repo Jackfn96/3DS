@@ -4,6 +4,10 @@
 .DS_Store
 data/
 *.csv
+*.h5
+*.jpg
+*.png
+*.npy
 **/__pycache__/
 .env
 .python-version
