@@ -7,10 +7,10 @@ from DDDS.drive import Drive
 
 class Annotations(Logs):
 
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, drive=None):
         super().__init__(debug=debug)
 
-        self.drive = Drive()
+        self.drive = drive if drive else Drive()
 
         # List folders and select 'Video validations'
         # This folder includes video annotation files which have been validated
