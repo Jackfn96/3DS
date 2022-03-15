@@ -4,6 +4,17 @@ setuptools>=26
 twine
 wheel>=0.29
 opencv-python
+openpyxl
+
+#visualization packages
+pydot
+ffmpeg
+cmake
+dlib
+mlxtend
+mtcnn_opencv
+imageio
+scikit-image
 
 # data science
 numpy
@@ -19,7 +30,7 @@ pytest
 yapf
 
 # API
-matlab
+
 # gcsfs
 # google-cloud-storage
 # mlflow
