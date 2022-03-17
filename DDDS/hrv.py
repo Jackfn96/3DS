@@ -109,3 +109,53 @@ class HRV(Logs):
             if timestamp in df.columns:
                 df[timestamp] = df[timestamp].apply(lambda x: pd.Timestamp(x, unit="ms"))
         return df
+
+
+
+### get dataframe for KNN model prediction ###
+
+def hrv_prediction(df):
+
+    # preprocessing hrv dataframes
+    df['Timestamp_Google'] = df['Timestamp_Google'].dt.round('1s')
+    df['time_points'] = df['Timestamp_Google'] - df['Timestamp_Google'].iloc[0]
+    df['time_points']= df['time_points']/np.timedelta64(1,'s')
+    df['time_points'] = df["time_points"].round().astype(int) 
+    
+    
+    df['time_points'] = df['Timestamp_Google'] - df['Timestamp_Google'].iloc[0]
+    df['time_points']= df['time_points']/np.timedelta64(1,'s')
+    df['time_points'] = df["time_points"].round().astype(int) 
+    
+    df['min_group'] = ((df['time_points'] / 60) + 1).round(0)
+    
+
+    test_df = df.copy()
+
+    new_df = pd.DataFrame(test_df.groupby('min_group'))
+
+    last_df = pd.DataFrame()
+
+    for group in new_df.index:
+
+        list_RR = []
+        working_df = test_df[test_df['min_group'] == group]
+
+        for RR_rate in working_df.RR_rate:
+
+            if RR_rate == '[]':
+                # empty cell
+                continue
+
+            RR_rate = str(RR_rate).strip('[]')
+
+            list_RR += [int(number) for number in RR_rate.split(', ')]
+
+        if len(list_RR) == 0:
+            continue
+        working_df['one_min_RR_avg'] = sum(list_RR) / len(list_RR)
+        last_df = last_df.append(working_df)
+    
+    last_df = last_df[['Timestamp_Google','Heart_Rate','one_min_RR_avg']]
+        
+    return last_df
