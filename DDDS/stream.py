@@ -10,7 +10,7 @@ from io import StringIO
 from PIL import Image
 from DDDS.combined_df import CombinedDFs
 from mtcnn import MTCNN
-from DDDS.face import build_model, face_detect
+from DDDS.face import FACE_IMG_SIZE, build_model, face_detect
 
 ### DATA SETTINGS ###
 VIDEO_PATH = 'data/red_or_green_line.avi'#2021-11-18 13-21-41 e99.flv'
@@ -18,14 +18,15 @@ RR_SERIES_ID = '24_11_2021_15_34 e99'
 DF_NUMBER = 7
 
 ### MODEL SELECTION ###
-KSS_MODEL_VERSION = 'vgg16_model_5.h5'
+KSS_MODEL_VERSION = 'model_base.h5'#'vgg16_model_5.h5'
+FACE_IMG_SIZE = (244, 244)
 
 ### SETTINGS ###
 FRAMES_PER_SECOND = 30  # FPS of the original video. DO NOT CHANGE
 HRV_GRAPH_DURIATION = 60_000 # Duration of heart rate graph history (ms)
 HRV_GRAPH_YLIM = [500, 1500] # xLim of HRV graph
 KSS_LIMITS = {  'red': 7.5, # By default label is green. Set thresholds to turn blue, yellow and red
-                'yellow': 4.5,
+                'yellow': 5.0,
                 'blue': 3.0}
 KSS_LABELS = ['Fully awake', 'Awake', 'Tired', 'Drowsy']    # Labels for KSS model display (correspond to colors)
 DISPLAY_EVENTS = 16 # Number if annotations to be displayed on screen
@@ -131,9 +132,9 @@ if 'hrv' not in st.session_state:
     data['CumSum'] = data['CumSum'] - instant_offset
     st.session_state.hrv = data.set_index('CumSum').loc[0:]
 
-KSS_columns = [str(x) for x in range(10)]
+KSS_columns = [str(x) for x in range(1, 11)]
 if 'KSS_probas' not in st.session_state:
-    st.session_state.KSS_probas = pd.DataFrame([[0.0, 0.0, 0, 0, 0.0, 0, 0, 0.0, 0.0, 1]], columns=KSS_columns)
+    st.session_state.KSS_probas = pd.DataFrame([[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]], columns=KSS_columns)
 
 if  'KSS_model' not in st.session_state:
     st.session_state.KSS_model = build_model(KSS_MODEL_VERSION)
@@ -155,11 +156,12 @@ def reload():
     st.session_state.pop('capture')
     st.session_state.pop('last_frame')
     st.session_state.pop('KSS_probas')
+    st.session_state.pop('KSS_model')
     st.session_state.pop('events')
     st.session_state.pop('face_detected')
 
 ### SIDEBAR ###
-skip_frames = st.sidebar.number_input('Skip frames', 1, 500, FRAMES_PER_SECOND)
+skip_frames = st.sidebar.number_input('Display every N frame:', 1, 500, FRAMES_PER_SECOND)
 play = st.sidebar.checkbox('Play / pause')
 fast_forward = st.sidebar.checkbox('Fast forward')
 st.sidebar.write('---')
@@ -242,6 +244,8 @@ def show_kss():
     for scale, score in average_scores.items():
         sum += int(scale)*score
 
+    sum *= 1.1
+
     with kss_bar:
         st.progress(int(sum*10))
     
@@ -277,7 +281,7 @@ while play:
         refresh_graph(st.session_state.instant, st.session_state.hrv, graph_container)
 
         # KSS detection
-        crop_frame = face_detect(frame, st.session_state.MTCNN)
+        crop_frame = face_detect(frame, st.session_state.MTCNN, FACE_IMG_SIZE)
         if crop_frame is None:
             st.session_state.face_detected = False
             continue

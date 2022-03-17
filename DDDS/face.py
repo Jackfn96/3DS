@@ -28,7 +28,7 @@ from tensorflow.keras.optimizers import SGD
 # coordiante of the face (approximately center)
 FACE_CENTER = (1100, 200)
 MODEL_PATH = os.path.abspath(os.path.join(__file__, '..', '..', 'models'))
-FACE_IMG_SIZE = (244, 244)
+FACE_IMG_SIZE = (224, 224)
 
 
 def bounding_box_check(faces, x, y):
@@ -55,7 +55,7 @@ def bounding_box_check(faces, x, y):
         return bounding_box
 
 
-def face_detect(frame, mtcnn):
+def face_detect(frame, mtcnn, face_img_size=FACE_IMG_SIZE):
     x, y = FACE_CENTER
     faces = mtcnn.detect_faces(frame)
     # check if detected faces
@@ -67,7 +67,7 @@ def face_detect(frame, mtcnn):
         return
     crop_img = frame[bounding_box[1]:bounding_box[1] + bounding_box[3],
                    bounding_box[0]:bounding_box[0] + bounding_box[2]]
-    crop_img = cv2.resize(crop_img, FACE_IMG_SIZE)
+    crop_img = cv2.resize(crop_img, face_img_size)
     return crop_img
 
 
@@ -103,5 +103,5 @@ def build_model(model = 'model_base.h5'):
     if not os.path.exists(model_file):
         raise FileExistsError(f"Model file {model_file} doesn't exists")
     
-    model_base = load_model()
+    model_base = load_model(model_file)
     return model_base
